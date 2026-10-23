@@ -306,7 +306,7 @@ func TestPlanSelection(t *testing.T) {
 	p.expect("hello")
 	scanID := p.scanned("s", 3)
 
-	const sudoReason = "needs administrator rights — run `regrow clean fixture-sudo` in Terminal"
+	const sudoReason = "needs administrator rights — run it in Terminal: `regrow clean fixture-sudo`"
 	tests := []struct {
 		name          string
 		selectJSON    string
@@ -394,7 +394,7 @@ func TestPlanSkipsNameThisEngineAndMissingPrograms(t *testing.T) {
 		t.Errorf("actions = %q, want the Trash move and the command whose program was found", got)
 	}
 	want := []engine.Skip{
-		{RuleID: "fixture-sudo", Reason: "needs administrator rights — run `'/Users/dev/Applications/Fixture App.app/Contents/MacOS/regrow-engine' clean --beta-rules fixture-sudo` in Terminal"},
+		{RuleID: "fixture-sudo", Reason: "needs administrator rights — run it in Terminal: `'/Users/dev/Applications/Fixture App.app/Contents/MacOS/regrow-engine' clean --beta-rules fixture-sudo`"},
 		{RuleID: "fixture-gone", Reason: "`gone-tool` is not on the PATH regrow was started with"},
 	}
 	if !sameJSON(t, e.Plan.Skipped, want) {
@@ -707,6 +707,22 @@ func TestBusyWhileExecuting(t *testing.T) {
 	gate.waitEntered(t, m.logs)
 	if done := p.expect("journal/x3", "journal/x3", "done/x3")[2]; done.Result.Done != 1 || exists(m.logs) {
 		t.Fatalf("an execute after the busy one did not run: %s", done.raw)
+	}
+}
+
+// A run's done names its folder in the staging directory, so a face can
+// show where its staged moves and volume exports are.
+func TestExecuteDoneNamesTheRunsStagingDir(t *testing.T) {
+	m := newMachine(t)
+	srv := m.server()
+	srv.StagingDir = func(runID string) string { return "/state/regrow/staging/" + runID }
+	p := start(t, srv)
+	p.expect("hello")
+	plan := p.planned("p1", p.scanned("s", 2), `["fixture-cache"]`)
+	p.send(`{"type":"execute","id":"x1","plan_id":"` + plan.PlanID + `"}`)
+	done := p.expect("journal/x1", "journal/x1", "done/x1")[2]
+	if want := "/state/regrow/staging/" + plan.PlanID; done.Staging != want {
+		t.Fatalf("staging_dir = %q, want %q: %s", done.Staging, want, done.raw)
 	}
 }
 

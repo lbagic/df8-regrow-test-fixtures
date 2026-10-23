@@ -62,14 +62,20 @@ final class Shell: ObservableObject {
         return skipped
     }
 
+    var engine: String {
+        config.engine
+    }
+
     var stagedBytes: Int64 {
         tick?.stagedBytes ?? 0
     }
 
     // MARK: Launch
 
-    func start() {
-        log("launched from \(Bundle.main.bundlePath), pid \(getpid())")
+    /// A launch at login opens no window; any other is the owner opening
+    /// the app.
+    func start(atLogin reason: String?) {
+        log("launched from \(Bundle.main.bundlePath), pid \(getpid())\(reason.map { ", at login: \($0)" } ?? "")")
         if Config.installed {
             notifier.askPermission()
             registerLoginItem()
@@ -92,7 +98,7 @@ final class Shell: ObservableObject {
                 }
             }
         }
-        if config.openScan {
+        if config.openScan || reason == nil {
             openScan()
         }
     }
@@ -257,6 +263,8 @@ final class Shell: ObservableObject {
                 shellEvent(line)
             case .command(let name):
                 pageCommand(name)
+            case .copy(let text):
+                copy(text)
             }
         }
     }
@@ -338,6 +346,12 @@ final class Shell: ObservableObject {
     }
 
     // MARK: The page
+
+    /// The owner opened the app while it runs.
+    func reopened() {
+        log("opened again: showing the window")
+        openScan()
+    }
 
     func openScan() {
         if let window {
@@ -423,6 +437,11 @@ final class Shell: ObservableObject {
         }
     }
 
+    func copy(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+
     func showStaging() {
         guard let stateDirectory else { return }
         NSWorkspace.shared.activateFileViewerSelecting([stateDirectory.appendingPathComponent("staging")])
@@ -436,7 +455,7 @@ final class Shell: ObservableObject {
             log("relaunch asked for outside a bundle: quit and start it again by hand")
             return
         }
-        let wait = #"i=0; while kill -0 "$1" 2>/dev/null && [ "$i" -lt 600 ]; do sleep 0.1; i=$((i+1)); done; exec /usr/bin/open "$2""#
+        let wait = #"i=0; while kill -0 "$1" 2>/dev/null && [ "$i" -lt 600 ]; do sleep 0.1; i=$((i+1)); done; exec /usr/bin/open "$2" --args --open-scan"#
         let null = open("/dev/null", O_RDWR | O_CLOEXEC)
         defer { close(null) }
         do {

@@ -1,9 +1,10 @@
 import AppKit
 import RegrowKit
+import ServiceManagement
 import SwiftUI
 
-/// The menu bar item is the app's only scene, so nothing opens at
-/// launch.
+/// The menu bar item is the app's only scene; the scan window is the
+/// shell's, opened from the menu or by opening the app.
 struct RegrowApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
     @ObservedObject private var shell = Shell.shared
@@ -46,6 +47,7 @@ struct MenuView: View {
         }
         if let error = shell.tickError {
             Text(error)
+            copyCommand(in: error)
         }
         if let down = shell.engineDown {
             Text("The engine is not running: \(down)")
@@ -55,6 +57,7 @@ struct MenuView: View {
         Toggle("Trim the Go build cache when space is low", isOn: $shell.autotrim)
         if let note = shell.autotrimNote {
             Text(note)
+            copyCommand(in: note)
         }
 
         Divider()
@@ -79,6 +82,14 @@ struct MenuView: View {
         Button("Scan…") { shell.openScan() }
         Button("Quit regrow") { MainRunLoop.quit() }
     }
+
+    /// A menu's text cannot be selected: a command a line quotes is
+    /// copied from the item under it.
+    @ViewBuilder private func copyCommand(in line: String) -> some View {
+        if let command = MenuText.command(in: line, engine: shell.engine) {
+            Button("Copy the command to run in Terminal") { shell.copy(command) }
+        }
+    }
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
@@ -99,7 +110,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ) { _ in
             MainActor.assumeIsolated { Shell.shared.woke() }
         }
-        Shell.shared.start()
+        Shell.shared.start(atLogin: Self.loginReason())
+    }
+
+    /// Why this launch is the login's, or nil when the owner opened the
+    /// app. The marker is read while the launch's open-application event
+    /// is the current one.
+    private static func loginReason() -> String? {
+        if let event = NSAppleEventManager.shared().currentAppleEvent, event.eventID == kAEOpenApplication,
+            event.paramDescriptor(forKeyword: keyAEPropData)?.enumCodeValue == keyAELaunchedAsLogInItem
+        {
+            return "marked as a login item"
+        }
+        // Only a registered login item is started by the login; the owner
+        // opening the app while that item runs is a reopen.
+        if LoginSession.isLoginLaunch(at: Date(), sessionStart: LoginSession.consoleStart()),
+            SMAppService.mainApp.status == .enabled
+        {
+            return "started within \(Int(LoginSession.window)) s of the login"
+        }
+        return nil
+    }
+
+    /// Opening the app while it runs, from Finder, Spotlight or `open`.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        Shell.shared.reopened()
+        return false
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {

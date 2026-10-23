@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -84,6 +85,29 @@ func TestRuleFilesAreNamedByID(t *testing.T) {
 	for _, f := range files {
 		if id := strings.TrimSuffix(f, ".yaml"); !ids[id] {
 			t.Errorf("rules/%s holds no rule with id %s", f, id)
+		}
+	}
+}
+
+// A command in a rule's text that starts with one of these, or a
+// program named by its path with arguments, is one the owner runs. The
+// app's page sets a quoted command on a line of its own, with its Copy,
+// only when a colon brings it in.
+var ownerCommands = []string{"sudo ", "regrow ", "softwareupdate "}
+
+func TestOwnerCommandsComeAfterAColon(t *testing.T) {
+	owners := func(quote string) bool {
+		byPath := strings.HasPrefix(quote, "/") && strings.Contains(quote, " ")
+		return byPath || slices.ContainsFunc(ownerCommands, func(p string) bool { return strings.HasPrefix(quote, p) })
+	}
+	for _, r := range catalog(t) {
+		for _, text := range []string{r.Note, r.Regen.Story} {
+			parts := strings.Split(text, "`")
+			for i := 1; i < len(parts)-1; i += 2 {
+				if owners(parts[i]) && !strings.HasSuffix(strings.TrimRight(parts[i-1], " "), ":") {
+					t.Errorf("%s: `%s` follows %q, not a colon", r.ID, parts[i], parts[i-1])
+				}
+			}
 		}
 	}
 }

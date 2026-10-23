@@ -155,6 +155,17 @@ struct AlertTextTests {
         #expect(AlertText.notice(forError: "tick_failed", message: "no sample") == nil)
     }
 
+    @Test("a locked gate's notice that quotes a command sends the owner to the menu to copy it")
+    func lockedGateCommand() {
+        let message = "autotrim is locked for go-build-cache until `regrow prune go-build --yes` has completed once"
+        #expect(
+            AlertText.notice(forError: "autotrim_locked", message: message)
+                == Notice(title: "Autotrim is locked", body: message + ". The menu bar menu copies the command."))
+        #expect(
+            AlertText.notice(forError: "autotrim_locked", message: message + ".")
+                == Notice(title: "Autotrim is locked", body: message + ". The menu bar menu copies the command."))
+    }
+
     @Test("a tick with nothing to say posts nothing")
     func quietTick() throws {
         #expect(AlertText.notices(for: try tick("")).isEmpty)
@@ -197,6 +208,29 @@ struct MenuTextTests {
             MenuText.tickError(code: "tick_failed", message: "statfs: input/output error")
                 == "Last check failed: statfs: input/output error")
         #expect(MenuText.tickError(code: "tick_failed", message: nil) == "Last check failed: tick_failed")
+    }
+
+    private static let engine = "/Users/dev/Applications/Regrow.app/Contents/MacOS/regrow-engine"
+    private static let locked = "Autotrim did not run: autotrim is locked for go-build-cache until `regrow prune go-build --yes` has completed once"
+
+    @Test("a line's quoted command is copied as Terminal takes it, regrow as the engine's path", arguments: [
+        (locked, engine, engine + " prune go-build --yes"),
+        (locked, "/Users/dev/Team's R&D/regrow-engine", #"'/Users/dev/Team'\''s R&D/regrow-engine' prune go-build --yes"#),
+        ("To list them: `tmutil listlocalsnapshots /`.", engine, "tmutil listlocalsnapshots /"),
+        ("`go` is not on the PATH; run `go clean -cache`", engine, "go clean -cache"),
+        ("`regrowth --x` is no regrow command", engine, "regrowth --x"),
+    ])
+    func command(line: String, engine: String, command: String) {
+        #expect(MenuText.command(in: line, engine: engine) == command)
+    }
+
+    @Test("a line that quotes no command has none to copy", arguments: [
+        "Last check failed: statfs: input/output error",
+        "`go` is not on the PATH",
+        "an unclosed `regrow prune go-build --yes",
+    ])
+    func noCommand(line: String) {
+        #expect(MenuText.command(in: line, engine: Self.engine) == nil)
     }
 
     @Test("staging bytes are read when the engine sends them")
@@ -292,5 +326,23 @@ struct RestartDelayTests {
         #expect(delays == [1, 2, 4, 8, 16, 32, 60, 60])
         #expect(delay.after(uptime: 61) == 1)
         #expect(delay.after(uptime: 0.1) == 2)
+    }
+}
+
+@Suite("Login session")
+struct LoginSessionTests {
+    @Test("a launch from just before the login record to two minutes after it is the login's")
+    func loginLaunch() {
+        let login = Date(timeIntervalSince1970: 1_791_000_000)
+        #expect(LoginSession.isLoginLaunch(at: login.addingTimeInterval(5), sessionStart: login))
+        #expect(LoginSession.isLoginLaunch(at: login.addingTimeInterval(-LoginSession.early), sessionStart: login))
+        #expect(!LoginSession.isLoginLaunch(at: login.addingTimeInterval(LoginSession.window), sessionStart: login))
+        #expect(!LoginSession.isLoginLaunch(at: login.addingTimeInterval(-LoginSession.early - 1), sessionStart: login))
+        #expect(!LoginSession.isLoginLaunch(at: login, sessionStart: nil))
+    }
+
+    @Test("a user with no console login has no session start")
+    func noConsoleLogin() {
+        #expect(LoginSession.consoleStart(user: "regrow-no-such-user") == nil)
     }
 }

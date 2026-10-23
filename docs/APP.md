@@ -1,6 +1,6 @@
 # The menubar app
 
-`Regrow.app` keeps regrow in the menu bar: free space, purgeable space, swap and days-to-full at a glance, a watch tick every 15 minutes and on wake whose alerts arrive as notifications, and a window that scans, plans and runs a clean. It is a shell around `regrow engine` ([ENGINE.md](ENGINE.md)): the Go binary sits inside the bundle and does all the work. The scan page follows [DESIGN.md](../DESIGN.md).
+`Regrow.app` keeps regrow in the menu bar: free space, purgeable space, swap and days-to-full at a glance, a watch tick every 15 minutes and on wake whose alerts arrive as notifications, and a window that scans, plans and runs a clean. Opening the app from Finder, Spotlight or `open` shows the window, also while it runs; a launch at login shows only the menu bar item, whose Scan… opens it. While Regrow is in your Login Items, a launch in the first two minutes after you log in counts as the login's and opens no window; opening the app while it runs always shows it, and so does a relaunch. It is a shell around `regrow engine` ([ENGINE.md](ENGINE.md)): the Go binary sits inside the bundle and does all the work. The scan page follows [DESIGN.md](../DESIGN.md).
 
 It builds with the Command Line Tools alone. No Xcode is needed.
 
@@ -65,7 +65,7 @@ The app's log is `~/Library/Logs/regrow/app.log`, with the engine's stderr in `e
 - Neither log is rotated.
 - An alert is a crossing, posted once as a notification. The menu shows the figures, not past alerts.
 - The first tick on an empty history counts a line free space is already under as crossed, so a state directory with no history and under 50 GiB free posts "Disk space is low" once.
-- With autotrim on and its gate locked, the menu says why under the switch. Once free space is low enough that a prune would have run, the tick ends in an error instead: the menu reads "Autotrim did not run", and the notification comes once, not with every tick.
+- With autotrim on and its gate locked, the menu says why under the switch. Once free space is low enough that a prune would have run, the tick ends in an error instead: the menu reads "Autotrim did not run", and the notification comes once, not with every tick. Either line quotes the prune to run once, and a menu's text cannot be selected, so under it "Copy the command to run in Terminal" copies it, `regrow` named by the engine's path; the notification says the menu copies it.
 - A second copy of the app started on the same state directory says so and quits. Where `app.lock` cannot be locked at all, both copies run, and neither stops an engine an earlier run left.
 - Quitting while a plan runs waits up to 30 s for the action in flight, then stops the engine. A steward command the engine had started runs on, or stops part-way once it writes to the engine that is gone; either way the oplog lacks that action's end.
 - If the engine stops during a command that exports first, such as a docker volume's removal, the export may sit in the run's folder in regrow staging while the oplog has only the action's start, not where the export went; the window's notice after the stop does not mention it.
