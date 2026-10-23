@@ -14,6 +14,9 @@
 #   scripts/app-smoke.sh doors   Starts the app the ways anything on this machine
 #                                can (open --env, open --args) and shows it runs and
 #                                moves nothing they name. No notification, no Trash.
+#   scripts/app-smoke.sh all     trash, alert and doors in turn, then one RESULT line
+#                                naming any that failed, and doors when skipped for a
+#                                folder trash left. `scripts/app.sh install` runs it.
 #
 # A second argument names another bundle to check, such as the one
 # `scripts/app.sh signed` leaves in app/.build/bundle.
@@ -25,12 +28,54 @@ set -eu
 APP="${2:-$HOME/Applications/Regrow.app}"
 mode="${1:-}"
 case "$mode" in
-trash | alert | doors) ;;
+trash | alert | doors | all) ;;
 *)
-	echo "usage: $0 trash|alert|doors [bundle]" >&2
+	echo "usage: $0 trash|alert|doors|all [bundle]" >&2
 	exit 64
 	;;
 esac
+
+# The first ~/regrow-smoke-* there is, a dangling link included.
+leftover() {
+	for other in "$HOME"/regrow-smoke-*; do
+		if [ -e "$other" ] || [ -L "$other" ]; then
+			echo "$other"
+			return
+		fi
+	done
+}
+
+# Each check runs on its own, so one that fails leaves the next its turn,
+# but for a folder trash leaves, which doors would refuse to start beside.
+if [ "$mode" = all ]; then
+	failed=""
+	skipped=""
+	for check in trash alert doors; do
+		echo "== $check"
+		left=$(leftover)
+		if [ "$check" = doors ] && [ -n "$left" ]; then
+			echo "SKIP doors: $left is still there."
+			skipped=" doors"
+			continue
+		fi
+		if ! sh "$0" "$check" "$APP"; then
+			failed="$failed $check"
+		elif [ "$check" = trash ] && left=$(leftover) && [ -n "$left" ]; then
+			echo "FAIL trash: $left is left in your home folder."
+			failed="$failed trash"
+		fi
+	done
+	if [ -z "$failed$skipped" ]; then
+		echo "RESULT ok: trash, alert and doors"
+		exit 0
+	fi
+	if [ -n "$failed" ]; then
+		echo "RESULT failed:$failed${skipped:+; skipped:$skipped}"
+	else
+		echo "RESULT skipped:$skipped"
+	fi
+	exit 1
+fi
 if [ ! -d "$APP" ]; then
 	echo "$APP is not installed: run \`just app\` first." >&2
 	exit 1
@@ -42,12 +87,11 @@ fi
 # The app's smoke rule moves every ~/regrow-smoke-*, so a check that can
 # reach it starts only when there is none, a link included.
 if [ "$mode" != alert ]; then
-	for other in "$HOME"/regrow-smoke-*; do
-		if [ -e "$other" ] || [ -L "$other" ]; then
-			echo "$other is there already, from an earlier check or another program, and the app would move it too. Move it out of your home folder, then run this again." >&2
-			exit 1
-		fi
-	done
+	other=$(leftover)
+	if [ -n "$other" ]; then
+		echo "$other is there already, from an earlier check or another program, and the app would move it too. Move it out of your home folder, then run this again." >&2
+		exit 1
+	fi
 fi
 
 # The app takes no other folder: the per-user temp folder from getconf, not
