@@ -60,6 +60,7 @@ var preActions = map[string]string{
 	engine.PreActionDockerUpdateRecheck:        "regrow judges the download again, as the scan did, and leaves it in place if any reason to keep it holds now.",
 	engine.PreActionCaskRecordRecheck:          "regrow asks brew about the cask again and leaves it installed unless its app is still gone and its uninstall still only quits the app and asks for no password.",
 	engine.PreActionRunningRecheck:             "regrow reads your running processes again, as the scan did, and leaves the item in place while what keeps it runs, your processes cannot be listed, the rule is not in the catalog regrow runs, or, for a rule that names apps, a running app's `Info.plist` cannot be read.",
+	engine.PreActionAppLeftoverRecheck:         "regrow judges the folder and the other folders of its maker again, as the scan did, and leaves it in place unless it is still offered: an app installed since, a change, or anything pointing into one of them keeps it, and so does a source that cannot be read.",
 }
 
 // PreActionText is the sentence for a hook, and false when the page has

@@ -367,6 +367,9 @@ func (r Rule) PerItemActionable() bool {
 // PreActionRunningRecheck reads the running processes again right
 // before a guarded rule's Trash move and refuses while its
 // unless_running holds or the processes cannot be read.
+// PreActionAppLeftoverRecheck judges an app's leftover folder again
+// right before it goes to the Trash and refuses unless it is still
+// offered.
 // A hook failure leaves the target in place. The registry of hook names
 // lives here so a typo'd pre_action fails at load, like a typo'd
 // placeholder; the implementations are registered on the executor.
@@ -382,13 +385,14 @@ const (
 	PreActionDockerUpdateRecheck        = "docker-update-recheck"
 	PreActionCaskRecordRecheck          = "cask-record-recheck"
 	PreActionRunningRecheck             = "running-recheck"
+	PreActionAppLeftoverRecheck         = "app-leftover-recheck"
 )
 
 var knownPreActions = map[string]bool{
 	PreActionVolumeExport: true, PreActionAgentScratchRecheck: true, PreActionWorktreeRecheck: true, PreActionBuildOutputRecheck: true,
 	PreActionNpxRecheck: true, PreActionDownloadedInstallerRecheck: true, PreActionFnmVersionRecheck: true,
 	PreActionSupersededBuildRecheck: true, PreActionDockerUpdateRecheck: true, PreActionCaskRecordRecheck: true,
-	PreActionRunningRecheck: true,
+	PreActionRunningRecheck: true, PreActionAppLeftoverRecheck: true,
 }
 
 // KnownPreActions lists every hook name a rule may declare, sorted. An

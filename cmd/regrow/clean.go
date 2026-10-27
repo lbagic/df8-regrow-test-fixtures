@@ -172,6 +172,9 @@ func newRunExecutor(host engine.Host, catalog []engine.Rule, runID string, strea
 				}
 				return nil, scanner.RecheckRunning(ctx, catalog[i], a.Path)
 			},
+			engine.PreActionAppLeftoverRecheck: func(ctx context.Context, a engine.Action) (*trash.Receipt, error) {
+				return nil, scanner.RecheckAppLeftover(ctx, a.Path)
+			},
 		},
 		RunID: runID,
 	}

@@ -55,6 +55,8 @@ func ActionCommand(a engine.Action) string {
 		s += "  (brew asked about the cask again first)"
 	case engine.PreActionRunningRecheck:
 		s += "  (what runs checked again first)"
+	case engine.PreActionAppLeftoverRecheck:
+		s += "  (folder and installed apps checked again first)"
 	default:
 		s += "  (pre: " + a.PreAction + ")"
 	}

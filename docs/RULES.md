@@ -2,7 +2,7 @@
 
 # What regrow scans
 
-regrow's catalog holds 85 rules: 44 safe, 28 caution and 13 surface-only. 48 of them are beta, and a scan includes them only with `--beta-rules`. Every entry below is written from the rule's file in [`rules/`](../rules), the catalog `regrow rules --beta-rules` lists. Paths are the macOS ones; the rules also carry Linux paths, for a Linux build that has not shipped. [SCAN.md](SCAN.md) says what a scan reads, which programs it runs, and what regrow writes.
+regrow's catalog holds 87 rules: 44 safe, 29 caution and 14 surface-only. 50 of them are beta, and a scan includes them only with `--beta-rules`. Every entry below is written from the rule's file in [`rules/`](../rules), the catalog `regrow rules --beta-rules` lists. Paths are the macOS ones; the rules also carry Linux paths, for a Linux build that has not shipped. [SCAN.md](SCAN.md) says what a scan reads, which programs it runs, and what regrow writes.
 
 How to read an entry:
 
@@ -881,6 +881,8 @@ System caches, logs, downloads and the Trash.
 | Rule | Risk | Removed by |
 |---|---|---|
 | [Aerial wallpaper videos](#aerial-wallpapers) | surface-only | never |
+| [App leftovers (no app has their id)](#app-leftovers) | caution, beta | Trash |
+| [App leftovers (kept)](#app-leftovers-kept) | surface-only, beta | never |
 | [Docker Desktop's unfinished update download](#docker-update-download) | caution, beta | Trash |
 | [Installers of installed apps](#downloaded-installers) | caution, beta | Trash |
 | [Local iOS device backups](#ios-backups) | surface-only | never |
@@ -903,6 +905,34 @@ System caches, logs, downloads and the Trash.
 - **Comes back:** macOS downloads videos again for each aerial category picked for the wallpaper or the screen saver (on macOS 15, at least 4 per category and more every day or two), and a still wallpaper chosen later leaves them picked. To remove the videos yourself on macOS 15 and earlier: `sudo find "/Library/Application Support/com.apple.idleassetsd/Customer" -type f -name '*.mov' -delete`. On macOS 26 and later: `sudo find ~/Library/Containers/com.apple.wallpaper.agent/Data/Library/Caches -type f -name '*.mov' -delete`. A video the downloader's temp folder also holds frees nothing until that copy goes too, and macOS 15 keeps those copies in a folder only root can read. To remove them (untested in this form): `sudo find /private/var/folders/zz -path '*/T/com.apple.idleassetsd/CFNetworkDownload_*.tmp' -delete`. Cost: n/a — regrow never deletes here; roughly 0.5 GB of download per video macOS fetches again.
 - **Fix the cause:** Aerial video downloads (macOS 15.x and earlier). `regrow doctor` says whether it is in effect here and prints the fix; regrow changes nothing.
 - **Note:** The videos come back while an aerial is picked for the wallpaper or the screen saver, even after a still wallpaper replaced it. To see how to stop the downloads: `regrow doctor`.
+
+### app-leftovers
+
+**App leftovers (no app has their id)** · caution · beta · [`rules/app-leftovers.yaml`](../rules/app-leftovers.yaml)
+
+- **Looks at:** the folders in `~/Library`'s Application Support, Caches, Containers, Group Containers, HTTPStorages, WebKit, Saved Application State and Application Scripts, each walked for its size and newest change, and the files beside them and in `~/Library/Preferences` and its `ByHost` folder; every `Info.plist` under `/Applications`, `~/Applications` and `/System/Applications`, and in each app Spotlight knows (`mdfind`) or one of your processes runs from; the entitlements of every app, plug-in and service among them (`codesign -d --entitlements`); the launchd jobs in `~/Library/LaunchAgents`, `/Library/LaunchAgents` and `/Library/LaunchDaemons` and the native messaging manifests of Chrome, Chromium, Arc, Edge, Brave, Vivaldi, Opera and Firefox; and the files your processes work in, run, map or hold open (`lsof`).
+- **Removed by:** a move to the Trash, one per item; `regrow undo` puts it back. Right before each removal, regrow judges the folder and the other folders of its maker again, as the scan did, and leaves it in place unless it is still offered: an app installed since, a change, or anything pointing into one of them keeps it, and so does a source that cannot be read.
+- **Keeps:**
+  - A folder whose name is the bundle id of any app, plug-in, helper or service installed there, or a string of an installed bundle's entitlements (its app groups).
+  - A folder whose name is not an id (an id has three or more dotted labels), and one whose id holds `com.apple`, which is macOS's own.
+  - An id that shares its maker (its first two labels) with an installed app, or whose product, the label after them, is an installed app's name.
+  - A folder in Application Support or Caches whose id, with or without a team id or group label in front, has no folder in Containers, Group Containers, Saved Application State or Application Scripts, the places macOS makes folders only for an app: tools and libraries name folders like ids too.
+  - Every folder of a maker, by the id's first two labels after a team id or group label (`com.example.app`, `com.example.app.helper` and `ABCDE12345.group.com.example` are one), when any of them, or a file beside them whose name gives the maker, whole or less its extension or host (a settings file in `~/Library/Preferences` or its `ByHost` folder, a cookie store in HTTPStorages, followed through a link), changed in the last 90 days, could not be read in full, or has something pointing into it: a launchd job or native messaging manifest (its text, or where it links to), an installed app's entitlements, or a running process's working folder, program, mapped or open file (regrow's own open files aside).
+  - A folder whose path lsof would print escaped, so a process in it could not be matched.
+  - Every folder, while a location cannot be read in full, since a folder of the same maker may be there; the location is a row saying so (Full Disk Access may be needed).
+  - Everything, when an app folder, a bundle (an app Spotlight knows or that runs among them), an `Info.plist`, entitlements, a launchd job, a manifest folder, `~/Library/Preferences` or its `ByHost` folder, or a file of a maker beside its folders cannot be read, when `lsof` or `mdfind` fails, or when `~/Library` belongs to another user than the one regrow runs as (a run under `sudo`): the rule then shows an error and offers nothing.
+  - Kept folders are listed, with the reason, under `app-leftovers-kept`.
+- **Comes back:** Not regenerated while the app is gone; an app installed again makes new folders and starts as on first launch. Undo puts a folder back from the Trash. Cost: the deleted app's settings, data and caches.
+- **Note:** An app reinstalled later starts without its settings, data or login. A folder that could not be read in full is never offered; with Full Disk Access granted to regrow's app, Containers and Group Containers can be read.
+
+### app-leftovers-kept
+
+**App leftovers (kept)** · surface-only · beta · [`rules/app-leftovers-kept.yaml`](../rules/app-leftovers-kept.yaml)
+
+- **Looks at:** the folders `app-leftovers` reads, in the same pass, and the names of macOS's own frameworks and programs (in `/System/Library/Frameworks`, `/System/Library/PrivateFrameworks`, `/System/Library/CoreServices`, `/usr/libexec` and `/usr/sbin`, and the files the launchd jobs in `/System/Library/LaunchAgents` and `/System/Library/LaunchDaemons` name, their programs among them), whose folders in Application Support are not listed; each row says why it is not offered.
+- **Removed by:** never: surface-only.
+- **Comes back:** n/a — regrow never deletes these; check the row's reason, then delete a folder yourself if its app is gone. Cost: n/a.
+- **Note:** Each row says why it is not offered. A folder in use, or one that changed recently, moves to "App leftovers (no app has their id)" once nothing points into any folder of its maker and none of them changed for 90 days.
 
 ### docker-update-download
 
